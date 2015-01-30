@@ -1,6 +1,17 @@
+#define INCL_GPI
 #define INCL_DOSERRORS
 #include <os2.h>
 
+#include <iostream>
+
+#include "Icon.hpp"
+#include "IconMgr.hpp"
+
+using namespace std;
+
+// forward declaration
+int checkType(char *archivo);
+void error_exit(int errorcode);
 
 void printError(IconError& error){
    cout << " " << error.function << endl << " " << error.file << '(' << error.line << ')'
@@ -8,8 +19,6 @@ void printError(IconError& error){
 }
 
 int unoAuno(char *archivoin, char *archivout){
-int retorno;
-char *bpal;
    try{
       if(checkType(archivoin)==1){
          WiconMgr *windowMgr = new WiconMgr();
@@ -36,17 +45,11 @@ FILEFINDBUF3 findbuffer={0};
 ULONG relargobuf=sizeof(FILEFINDBUF3);
 ULONG fcontador=1;
 APIRET rc=0;
-HFILE handlearchivo=0L;
-ULONG accion=0;
-ULONG cbRead;
 ULONG numDrive = 0;
 ULONG largoDir = 0;
 BYTE dirActual[256] = "";
 CHAR dirNew[256] = "";
 PEAOP2 pEABuf = NULL;
-int indice=0;
-char *bpal;
-int retorno;
 
    try{
       largoDir = (ULONG)sizeof(dirActual);
@@ -113,21 +116,21 @@ int retorno;
 /*********************************************************************************************/
 
 int checkType(char *archivo){
-   int largo = strlen(archivo) +1;
-   char *ext = "ico\0";
-   char ver[3];
-   int i=0;
-   while(i<largo){
-      if(archivo[i] == '.'){
+   int largo = strlen(archivo);
+   char *ext = "ico";
+   char ver[3+1];
+   int i=largo-1;
+   while(i >=0){
+      if(archivo[i] == '.' && i + 3 < largo){
          ver[0] = archivo[i+1];
          ver[1] = archivo[i+2];
          ver[2] = archivo[i+3];
          ver[3] = '\0';
          break;
       }
-      i++;
+      i--;
    }
-   if((strcmp(ext,ver)!=0) || (i == (largo-1)))
+   if((strcmp(ext,ver)!=0) || (i < 0))
       return -1;
    else
       return 1;

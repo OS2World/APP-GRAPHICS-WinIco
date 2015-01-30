@@ -1,3 +1,9 @@
+#include <iostream>
+
+#include "IconMgr.hpp"
+
+using namespace std;
+
 #define ICONO_20X20  20
 #define ICONO_40X40  40
 
@@ -8,14 +14,30 @@ Os2IconMgr12* WiconMgr::codecOs2Icon12(){
    Os2IconMgr12 *iconoWarp = new Os2IconMgr12();
    //Se parte de la imagen mas peque¤a para que el WPS asuma la imagen mas grande al desplegarla
    for(int i=numImagenes-1; i >= 0;i--){
-      //Solo proceso las imagenes de 16x16 y 32x32
-      if(iconoWindows->getIdEntries()[i]->getBWidth() == 16 || iconoWindows->getIdEntries()[i]->getBWidth() == 32){
-         IconImage *imagenWin = iconoWindows->getIdEntries()[i]->getIconImage();
-         Os2Icon12 *newIconWarp = new Os2Icon12(imagenWin);
-         //Agrego al manager la imagen del icono
-         iconoWarp->addImage(newIconWarp);
-         //Dependiendo de si es una imagen de 16 o 32 se crea una imagen ya sea de 20 o 40
-         iconoWarp->addImageGrande(newIconWarp);
+      IconDirEntry *entry = iconoWindows->getIdEntries()[i];
+      int width = entry->getBWidth();
+      IconImage *imagenWin = entry->getIconImage();
+
+      cout << "Found image : "
+           << width << "x" << width << "x" << imagenWin->getBitsXPixel()
+           << ", ";
+
+      switch(width){
+         case 0:
+            cout << "Not suppored !!!" << endl;
+            break;
+
+         default:{
+            cout << "Converting..." << endl;
+
+            Os2Icon12 *newIconWarp = new Os2Icon12(imagenWin);
+            //Agrego al manager la imagen del icono
+            iconoWarp->addImage(newIconWarp);
+            //Dependiendo de si es una imagen de 16 o 32 se crea una imagen ya sea de 20 o 40
+            if(width == 16 || width == 32)
+               iconoWarp->addImageGrande(newIconWarp);
+            break;
+         }
       }
    }
    iconoWarp->setNumImages();
@@ -67,7 +89,6 @@ void WiconMgr::winIniIcon() throw (IconError){
   PBYTE offset;
   PBYTE pData;
   PBYTE pIDEref;
-  int aux = 0;
   IconDir *picondir = new IconDir();
   picondir->setIdReserved((USHORT)*this->pDatos);
   picondir->setIdType((USHORT)*(pDatos+sizeof(USHORT)));
@@ -102,6 +123,10 @@ void Os2IconMgr12::grabaIcono(char* nArchivo){
    HFILE fileHandle;
    this->llenaOffSets();
    vector<Os2Icon12*>::iterator i = listaImagenes.begin();
+   if (listaImagenes.size() == 0){
+     printf("No images to save\n");
+     exit(0);
+   }
    rc = DosOpen(nArchivo,&fileHandle,&accion,0L,FILE_NORMAL,OPEN_ACTION_CREATE_IF_NEW,OPEN_SHARE_DENYNONE|OPEN_ACCESS_WRITEONLY,0L);
    if(rc!=0){
       printf("Error al crear el archivo para guardar el icono\n");
@@ -125,7 +150,7 @@ void Os2IconMgr12::grabaIcono(char* nArchivo){
          rc = DosWrite(fileHandle,(*i)->getPHead(),sizeof(BITMAPFILEHEADER),&bwrote);
          if(rc!=0)
             printf("Error al grabar el encabezado del la imagen color\n");
-         if((*i)->getBitsXPixel() != 24){
+         if((*i)->getBitsXPixel() != 24 && (*i)->getBitsXPixel() != 32){
             rc = DosWrite(fileHandle,(*i)->getPPaletaColor(),(*i)->sizePaleta(),&bwrote);
             if(rc!=0)
                printf("Error al grabar la paleta de la imagen color\n");
@@ -134,6 +159,9 @@ void Os2IconMgr12::grabaIcono(char* nArchivo){
       }
       i = listaImagenes.begin();
       while(i != listaImagenes.end()){
+         printf("Writing %dx%dx%d image...\n",
+                (*i)->getAncho(), (*i)->getAlto(), (*i)->getBitsXPixel());
+
          rc = DosWrite(fileHandle,(*i)->getMaskData(),((*i)->getMaskSize()*2),&bwrote);
          if(rc!=0)
             printf("Error al grabar los datos de la mascara\n");
@@ -243,7 +271,6 @@ void Os2IconMgr12::llenaOffSets(){
    vector<Os2Icon12*>::iterator i = listaImagenes.begin();
    int ant = 0;
    int acuNext = 0;
-   IconBIH *aux = new IconBIH();
    int base = firstOffSet();
    int j = listaImagenes.size();
    int cont = 0;
@@ -256,7 +283,7 @@ void Os2IconMgr12::llenaOffSets(){
       }
       (*i)->getPArray()->bfh.offBits = base;
       (*i)->getIbih()->setIBIH(&((*i)->getPArray()->bfh.bmp));
-      ant = (*i)->getSizeImage();
+      ant = (*i)->getMaskSize() * 2;
       (*i)->getPHead()->offBits = base + ant;
       (*i)->getIbih()->setIBIH(&((*i)->getPHead()->bmp));
       ant = ant + (*i)->getSizeImage();
@@ -337,7 +364,7 @@ void Os2IconMgr12::setNumImages(){
 }
 
 PBYTE Os2IconMgr::centerMaskData(PBYTE data, const int tamanio){
-   int delta,offset,i,j,largoScan,smallSize;
+   int delta,i,j,largoScan,smallSize;
    PBYTE scanor;
    PBYTE scands;
    PBYTE scanax;
@@ -376,9 +403,9 @@ PBYTE Os2IconMgr::centerMaskData(PBYTE data, const int tamanio){
       if(tamanio == ICONO_40X40){
          while(j<5){
             aux1 = *scandsX & 15;
-            *scandsX = *scandsX >> 4;
+            *scandsX = (*scandsX >> 4) & 15;
             *scandsX = *scandsX | aux2;
-            aux2 = aux1 << 4;
+            aux2 = (aux1 << 4) & 240;
             scandsX++;
             j++;
          }
@@ -391,9 +418,9 @@ PBYTE Os2IconMgr::centerMaskData(PBYTE data, const int tamanio){
       else{
          while(j<3){
             aux1 = *scandsX & 3;
-            *scandsX = *scandsX >> 2;
+            *scandsX = (*scandsX >> 2) & 63;
             *scandsX = *scandsX | aux2;
-            aux2 = aux1 << 6;
+            aux2 = (aux1 << 6) & 192;
             scandsX++;
             j++;
          }
@@ -411,12 +438,12 @@ PBYTE Os2IconMgr::centerMaskData(PBYTE data, const int tamanio){
 }
 
 PBYTE Os2IconMgr::centerImageData(PBYTE data, const int tamanio, int bits){
-   int delta,offset,i,largoScan,largoScanOr,ppc,numScans;
+   int delta,i,largoScan,largoScanOr,ppc,numScans;
    PBYTE scanor;
    PBYTE scands;
    PBYTE retorno;
-   if(bits==24)
-      ppc=3;
+   if(bits==24 || bits==32)
+      ppc=bits/8;
    else
       ppc=1;
    if(tamanio == ICONO_20X20){

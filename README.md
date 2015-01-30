@@ -14,6 +14,7 @@ COMPILE TOOLS
 AUTHORS
 =============
 - Leonardo Pino 
+- KO Myung-Hun
 
 LINKS
 =============

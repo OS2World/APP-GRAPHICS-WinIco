@@ -1,3 +1,8 @@
+#include <cstdlib>
+#include <cstring>
+
+#include "Icon.hpp"
+
 int Os2Icon::ipow(int b, int e){
    int p=b;
    while(--e)
@@ -17,61 +22,42 @@ void Os2Icon::setMaskData(PBYTE datos){
    memcpy(pMaskData+maskSize,datos,maskSize);
 }
 ULONG Os2Icon::getSizeImage(){
-   ULONG ret,res;
-   int divisor,potencia;
-   divisor = ibih->getCx()/4;
-   if(ibih->getCBitCount() > 1){
-      potencia = ibih->getCBitCount()/8;
-      ret = ibih->getCx() * ibih->getCy() * potencia;
-   }
-   else{
-      if(ibih->getCx()==20 || ibih->getCx()==40)
-         ret = (ibih->getCx()/5) * (ibih->getCx()*2);
-      else
-         ret = (ibih->getCx()*ibih->getCy())/divisor;
-   }
-   return ret;
+   ULONG ret;
+
+   // Convert pixel to bits
+   ret = ibih->getCx() * ibih->getCBitCount();
+
+   // Conver to bytes
+   ret = (ret + 7) / 8;
+
+   // Align with 4 bytes boundary
+   ret = (ret + 3 ) & ~3;
+
+   // Return the image size
+   return ret * ibih->getCy();
 }
 
 ULONG Os2Icon::getSizeMaskImage(){
-   ULONG ret,res;
-   switch(Mibih->getCx()){
-      case 16:
-         ret=64;
-         break;
-      case 20:
-         ret=80;
-         break;
-      case 32:
-         ret=128;
-         break;
-      case 40:
-         ret=320;
-         break;
-      default:
-         break;
-   }
-/*   if(Mibih->getCx()==16)
-      ret=64;
-      else
-         if(Mibih->getCx()==20)
-            ret=80;
-            else
-               if(Mibih->getCx()==32)
-                  ret=128;
-                  else
-                     if(Mibih->getCx()==40)
-                        ret=320;
-*/
-//   cout << "getSizeMaskImage: X=" << Mibih->getCx() << " ret=" << ret << endl;
-   return ret;
+   ULONG ret;
+
+   // Convert pixel to bits
+   ret = Mibih->getCx(); // Mask image is 1 bits per pixel
+
+   // Conver to bytes
+   ret = (ret + 7) / 8;
+
+   // Align with 4 bytes boundary
+   ret = (ret + 3 ) & ~3;
+
+   // Return the size of mask image which is square
+   return ret * Mibih->getCx();
 }
 
 ULONG Os2Icon::sizePaleta(){
    ULONG buffer;
    int porte;
    int numbits = getIbih()->getCPlanes()*getIbih()->getCBitCount();
-   if(numbits != 24)
+   if(numbits != 24 && numbits != 32)
       porte = ipow(2,numbits);
    else
       porte = 0;
@@ -80,7 +66,7 @@ ULONG Os2Icon::sizePaleta(){
 }
 
 void Os2Icon12::convPal(RgbQuad *bpaleta, int colores){
-   int i, j;
+   int i;
    pPaletaColor = (RGB*)malloc(colores*sizeof(RGB));
    for(i=0;i<colores;i++){
       pPaletaColor[i].bRed = bpaleta[i].getBlue();
@@ -110,7 +96,7 @@ Os2Icon12::Os2Icon12(IconImage *imagenWin){
    pArray = new BITMAPARRAYFILEHEADER;
    pHead = new BITMAPFILEHEADER;
    //No configuro la paleta de colores si es un icono de 24 bits
-   if(imagenWin->getBitsXPixel() != 24)
+   if(imagenWin->getBitsXPixel() != 24 && imagenWin->getBitsXPixel() != 32)
       convPal(imagenWin->getIcColors(),imagenWin->getNumColores());
    setNumBitsColores(imagenWin->getBitsXPixel());
    setPalBW();
